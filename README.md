@@ -1,25 +1,54 @@
-# Task Manager - SOLID Principles (Laboratorul 3)
+# Task Manager - Refactorizare SOLID & IoC (Laboratorul 4)
 
-Acest proiect este o aplicație de tip Task Manager dezvoltată în C# (.NET 8), având ca scop principal aplicarea și demonstrarea celor 5 principii **SOLID** în arhitectura software. Proiectul folosește o bază de date SQLite și include teste unitare (NUnit) pentru validarea logicii.
+Acest proiect demonstrează implementarea completă a celor 5 principii **SOLID** și utilizarea unui container **IoC (Inversion of Control)** pentru injectarea dependențelor într-o aplicație .NET 8 Web API.
 
-## 🛠️ Cum au fost aplicate principiile SOLID în acest cod:
+## 🏛️ Arhitectura și Dependențele Proiectului
 
-* **S - Single Responsibility Principle (SRP)**
-  Clasele au o singură responsabilitate clară. De exemplu, `TaskValidator` se ocupă strict de validarea datelor, `SqliteTaskRepository` se ocupă doar de salvarea în baza de date, iar `EmailNotifier` doar de trimiterea notificărilor. Nu am amestecat validarea cu salvarea în aceeași clasă.
+Proiectul este structurat astfel încât `TaskManager.Core` să fie complet izolat, respectând regula de aur: **Domeniul (Core) nu depinde de nimeni.**
 
-* **O - Open/Closed Principle (OCP)**
-  Sistemul este deschis pentru extindere, dar închis pentru modificare. De exemplu, am creat o clasă de bază abstractă `TaskItem`. Pentru a adăuga tipuri noi de task-uri (`StandardTask`, `DeadlineTask`, `RecurringTask`), am creat clase noi care extind baza, fără să fiu nevoit să modific codul existent din `TaskItem`.
+```text
++-------------------+       +-------------------+
+|                   |       |                   |
+|  TaskManager.UI   | ----> | TaskManager.Core  | <---- ZERO dependențe externe
+|  (IoC Container)  |       |                   |
+|                   |       +-------------------+
++---------+---------+                 ^
+          |                           |
+          |                           |
+          v                           |
++-------------------+                 |
+|                   |                 |
+| TaskManager.Data  | ----------------+
+|    (SQLite)       |
+|                   |
++-------------------+
+🛠️ Decizii de design SOLID (Justificări)
+S - Single Responsibility Principle (SRP)
 
-* **L - Liskov Substitution Principle (LSP)**
-  Orice clasă derivată poate înlocui clasa de bază fără a strica funcționalitatea. Am implementat metoda `CompleteCore()` în clasele derivate, asigurându-mă că post-condițiile (ex: statusul trebuie să devină "Done") sunt respectate indiferent de tipul specific al task-ului.
+Unde: TaskValidator, ReportService, clasele de Notifiers.
 
-* **I - Interface Segregation Principle (ISP)**
-  Am folosit interfețe mici și specifice, care nu forțează clasele să implementeze metode de care nu au nevoie. De exemplu: `ITaskRepository` pentru manipularea datelor și `ITaskNotifier` exclusiv pentru sistemul de alerte.
+Problema rezolvată: Inițial, logica de validare și salvare se pot amesteca. Am izolat validarea datelor, salvarea în BD și generarea de rapoarte în clase diferite. Fiecare clasă are un singur motiv clar de a se schimba.
 
-* **D - Dependency Inversion Principle (DIP)**
-  Clasa principală de logică (`TaskService`) nu depinde de implementări concrete (cum ar fi `SqliteTaskRepository`), ci depinde de abstracții (interfețele `ITaskRepository` și `ITaskNotifier`). Acest lucru a permis injectarea ușoară a unui `InMemoryTaskRepository` în timpul testelor (Dependency Injection).
+O - Open/Closed Principle (OCP)
 
-## 🚀 Tehnologii folosite:
-* C# / .NET 8 (Web API)
-* SQLite (Microsoft.Data.Sqlite)
-* NUnit & NUnit3TestAdapter pentru Unit Testing
+Unde: Ierarhia de modele (TaskItem, DeadlineTask, RecurringTask) și sistemul de notificări.
+
+Problema rezolvată: Pentru a adăuga un nou tip de task sau un nou mod de notificare (ex: SMS), adăugăm o clasă nouă care extinde interfețele existente. Nu modificăm codul de bază al serviciului principal.
+
+L - Liskov Substitution Principle (LSP)
+
+Unde: Metoda CompleteCore() din clasele derivate.
+
+Problema rezolvată: Am creat post-condiții explicite (statusul trebuie să fie "Done"). Indiferent dacă folosim StandardTask sau RecurringTask, TaskService le poate completa pe toate la fel, fără să pice.
+
+I - Interface Segregation Principle (ISP)
+
+Unde: Extragerea ITaskReader și ITaskWriter din ITaskRepository.
+
+Problema rezolvată: Clasa ReportService are nevoie doar să citească date pentru a genera un sumar. Prin crearea lui ITaskReader, am protejat baza de date (raportul nu va avea niciodată acces la metodele de .Add() sau .Delete()). ReportService primește prin constructor DOAR ce are nevoie.
+
+D - Dependency Inversion Principle (DIP)
+
+Unde: TaskService depinde de interfețe, nu de implementări. Program.cs se ocupă de asamblare (Composition Root).
+
+Problema rezolvată: Modulele de nivel înalt (Core) nu depind de cele de nivel scăzut (Data / SQLite). Prin mutarea tuturor interfețelor în Core și injectarea cu containerul IoC din UI, decuplăm total codul. Astfel am putut scrie teste unitare folosind InMemoryTaskRepository în loc de o bază de date reală.
