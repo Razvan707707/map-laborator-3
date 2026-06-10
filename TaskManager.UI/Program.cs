@@ -6,18 +6,22 @@ using TaskManager.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var notifiers = new Dictionary<string, ITaskNotifier>
-{
-    { "Email", new EmailNotifier() },
-    { "Console", new ConsoleNotifier() },
-    { "FileLog", new FileLogNotifier() }
-};
+// CERINȚA 3: Înregistrarea dependențelor în containerul IoC (Fără "new" manual)
+builder.Services.AddSingleton<ITaskRepository>(sp => new SqliteTaskRepository("Data Source=tasks.db"));
+builder.Services.AddSingleton<ITaskReader>(sp => sp.GetRequiredService<ITaskRepository>());
 
-var repository = new SqliteTaskRepository("Data Source=tasks.db");
-var validator = new TaskValidator();
-var taskService = new TaskService(repository, validator, notifiers);
+builder.Services.AddTransient<TaskValidator>();
+builder.Services.AddTransient<TaskService>();
+builder.Services.AddTransient<ReportService>();
 
-builder.Services.AddSingleton(taskService);
+// Factory pentru Dicționarul de notificatori
+builder.Services.AddSingleton<IReadOnlyDictionary<string, ITaskNotifier>>(sp =>
+    new Dictionary<string, ITaskNotifier>
+    {
+        { "Email", new EmailNotifier() },
+        { "Console", new ConsoleNotifier() },
+        { "FileLog", new FileLogNotifier() }
+    });
 
 var app = builder.Build();
 
@@ -38,4 +42,9 @@ app.MapPost("/tasks/{id}/complete", (int id, TaskService service) => {
     }
 });
 
-app.Run();AbandonedMutexException f;
+// Endpoint nou ca să putem testa ReportService direct din browser
+app.MapGet("/tasks/report", (ReportService reportService) => {
+    return Results.Ok(reportService.GenerateSummary());
+});
+
+app.Run();

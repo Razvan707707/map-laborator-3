@@ -22,9 +22,10 @@ public class TaskService
 
     public TaskService(ITaskRepository repository, TaskValidator validator, IReadOnlyDictionary<string, ITaskNotifier> notifiers)
     {
-        _repository = repository;
-        _validator = validator;
-        _notifiers = notifiers;
+        // DIP: Protejăm serviciul cerând explicit interfețele în constructor
+        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        _notifiers = notifiers ?? throw new ArgumentNullException(nameof(notifiers));
     }
 
     public void AddTask(TaskItem task)
@@ -39,5 +40,24 @@ public class TaskService
         task.Complete();
         _repository.Update(task);
         if (_notifiers.TryGetValue(task.NotificationType, out var notifier)) notifier.Notify(task);
+    }
+}
+
+// NOU: ReportService (Cerinta 1 - ISP)
+public class ReportService
+{
+    private readonly ITaskReader _reader;
+
+    public ReportService(ITaskReader reader)
+    {
+        _reader = reader ?? throw new ArgumentNullException(nameof(reader));
+    }
+
+    public string GenerateSummary()
+    {
+        var tasks = _reader.GetAll();
+        int total = tasks.Count();
+        int done = tasks.Count(t => t.Status == "Done");
+        return $"Total tasks: {total}, Completed: {done}";
     }
 }
